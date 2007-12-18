@@ -15,9 +15,7 @@ build_requires 'Config'     => 0;
 build_requires 'XSLoader'   => 0;
 build_requires 'Test::More' => 0; # 5.007003
 
-makemaker_args DIR => [ 'libpcre' ];
-makemaker_args INC => '-Ilibpcre';
-makemaker_args LDDLFLAGS => '-shared libpcre/*.o';
+makemaker_args LIBS => [ '-lpcre' ];
 
 tests 't/*.t t/*/*.t';
 

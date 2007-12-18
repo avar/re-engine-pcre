@@ -41,8 +41,7 @@ re::engine::PCRE - Perl-compatible regular expression engine
 =head1 DESCRIPTION
 
 Replaces perl's regex engine in a given lexical scope with PCRE
-regular expressions provided by libpcre. Currently version 7.2 of PCRE
-is shipped with the module.
+regular expressions provided by libpcre.
 
 =head1 AUTHORS
 
@@ -57,8 +56,5 @@ E<lt>cpan@audreyt.orgE<gt> and Yves Orton.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
-
-The included F<libpcre> by I<Philip Hazel> is under a BSD-style
-license. See the F<LICENCE> file for details.
 
 =cut
