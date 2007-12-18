@@ -1,0 +1,10 @@
+^Makefile$
+^blib\/
+\.o$
+pm_to_blib$
+^PCRE\.(?:bs|c)$
+\.bak$
+\.old$
+^\.?#
+Makefile$
+\.bs$
