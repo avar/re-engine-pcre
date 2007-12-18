@@ -1,6 +1,4 @@
 use 5.009005;
-use utf8;
-use strict;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
