@@ -6,6 +6,8 @@
   every time pcre was updated would have been painful (and I was
   already out of date).
 
+* Killed M::I (again) in favor of ExtUtils::MakeMaker
+
 [Changes for 0.13 - 2007-07-16]
 
 * Release by: Ævar Arnfjörð Bjarmason
