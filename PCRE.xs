@@ -35,8 +35,12 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
     if (flags & RXf_SPLIT && plen == 1 && exp[0] == ' ')
         extflags |= (RXf_SKIPWHITE|RXf_WHITE);
 
+    /* RXf_NULL - Have C<split //> split by characters */
+    if (plen == 0)
+        extflags |= RXf_NULL;
+
     /* RXf_START_ONLY - Have C<split /^/> split on newlines */
-    if (plen == 1 && exp[0] == '^')
+    else if (plen == 1 && exp[0] == '^')
         extflags |= RXf_START_ONLY;
 
     /* RXf_WHITE - Have C<split /\s+/> split on whitespace */
