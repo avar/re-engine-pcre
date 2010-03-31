@@ -1,6 +1,6 @@
 #!./perl
 
-#use Test::More skip_all => "Not run by default, remove this line to 
+use Test::More skip_all => "TODO";
 
 # The tests are in a separate file 't/op/re_tests'.
 # Each line in that file is a separate test.

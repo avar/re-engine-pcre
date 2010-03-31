@@ -1,3 +1,14 @@
+Revision history for re::engine::PCRE
+
+{{$NEXT}}
+
+    - Re-release on CPAN. The package was previously deleted so the
+      only remaining re::engine::PCRE was an ancient one by Yves.
+
+    - Use Dist::Zilla to build this distro.
+
+    - Depend on perl 5.10.
+
 [Changes for 0.15 - 2007-12-18]
 
 * Release by: Ævar Arnfjörð Bjarmason
