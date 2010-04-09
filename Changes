@@ -2,7 +2,7 @@ Revision history for re::engine::PCRE
 
 {{$NEXT}}
 
-0.15 2010-03-31 15:06:01
+0.16 2010-04-09 14:56:09
 
     - Re-release on CPAN. The package was previously deleted so the
       only remaining re::engine::PCRE was an ancient one by Yves.
