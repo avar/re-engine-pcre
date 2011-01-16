@@ -16,7 +16,7 @@ EXTERN_C void *   PCRE_dupe(pTHX_ REGEXP * const, CLONE_PARAMS *);
 #endif
 END_EXTERN_C
 
-void PCRE_make_nametable(REGEXP * const, pcre * const, const int);
+void PCRE_make_nametable(regexp * const, pcre * const, const int);
 
 const regexp_engine pcre_engine = {
     PCRE_comp,

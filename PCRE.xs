@@ -6,16 +6,24 @@
 
 #include "PCRE.h"
 
+#if PERL_VERSION > 10
+#define RegSV(p) SvANY(p)
+#else
+#define RegSV(p) (p)
+#endif
+
 REGEXP *
 PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
 {
     REGEXP *rx;
+    regexp *re;
     pcre   *ri;
 
     STRLEN plen;
     char  *exp = SvPV((SV*)pattern, plen);
     char *xend = exp + plen;
     U32 extflags = flags;
+    SV * wrapped = newSVpvn("(?", 2), * wrapped_unset = newSVpvn("", 0);
 
     /* pcre_compile */
     const char *error;
@@ -30,6 +38,9 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
 
     /* named captures */
     int namecount;
+
+    sv_2mortal(wrapped);
+    sv_2mortal(wrapped_unset);
 
     /* C<split " ">, bypass the PCRE engine alltogether and act as perl does */
     if (flags & RXf_SPLIT && plen == 1 && exp[0] == ' ')
@@ -56,9 +67,14 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
     if (flags & RXf_PMf_MULTILINE)
         options |= PCRE_MULTILINE; /* /m */
 
+
     /* The pattern is known to be UTF-8. Perl wouldn't turn this on unless it's
      * a valid UTF-8 sequence so tell PCRE not to check for that */
+#ifdef RXf_UTF8
     if (flags & RXf_UTF8)
+#else
+    if (SvUTF8(pattern))
+#endif
         options |= (PCRE_UTF8|PCRE_NO_UTF8_CHECK);
 
     ri = pcre_compile(
@@ -71,25 +87,56 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
 
     if (ri == NULL) {
         croak("PCRE compilation failed at offset %d: %s\n", erroffset, error);
+        sv_2mortal(wrapped);
         return NULL;
     }
-    
-    Newxz(rx, 1, REGEXP);
-    
-    rx->refcnt   = 1;
-    rx->extflags = extflags;
-    rx->engine   = &pcre_engine;
 
-    /* Preserve a copy of the original pattern */
-    rx->prelen = (I32)plen;
-    rx->precomp = SAVEPVN(exp, plen);
+#if PERL_VERSION > 10
+    rx = (REGEXP*) newSV_type(SVt_REGEXP);
+#else
+    Newxz(rx, 1, REGEXP);
+    rx->refcnt = 1;
+#endif
+
+    re = RegSV(rx);
+    re->extflags = extflags;
+    re->engine   = &pcre_engine;
 
     /* qr// stringification, TODO: (?flags:pattern) */
-    rx->wraplen = rx->prelen;
-    rx->wrapped = (char *)rx->precomp;
+    sv_catpvn(flags & RXf_PMf_FOLD ? wrapped : wrapped_unset, "i", 1);
+    sv_catpvn(flags & RXf_PMf_EXTENDED ? wrapped : wrapped_unset, "x", 1);
+    sv_catpvn(flags & RXf_PMf_MULTILINE ? wrapped : wrapped_unset, "m", 1);
+
+    if (SvCUR(wrapped_unset)) {
+      sv_catpvn(wrapped, "-", 1);
+      sv_catsv(wrapped, wrapped_unset);
+    }
+
+    sv_catpvn(wrapped, ":", 1);
+#if PERL_VERSION > 10
+    re->pre_prefix = SvCUR(wrapped);
+#endif
+
+    sv_catpvn(wrapped, exp, plen);
+    sv_catpvn(wrapped, ")", 1);
+
+#if PERL_VERSION == 10
+    re->wraplen = SvCUR(wrapped);
+    re->wrapped = savepvn(SvPVX(wrapped), SvCUR(wrapped));
+#else
+    RX_WRAPPED(rx) = savepvn(SvPVX(wrapped), SvCUR(wrapped));
+    RX_WRAPLEN(rx) = SvCUR(wrapped);
+    //Perl_sv_dump(rx);
+#endif
+
+#if PERL_VERSION == 10
+    /* Preserve a copy of the original pattern */
+    re->prelen = (I32)plen;
+    re->precomp = SAVEPVN(exp, plen);
+#endif
 
     /* Store our private object */
-    rx->pprivate = ri;
+    re->pprivate = ri;
 
     /* If named captures are defined make rx->paren_names */
     pcre_fullinfo(
@@ -100,9 +147,9 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
     );
 
     if (namecount <= 0) {
-        rx->paren_names = NULL;
+        re->paren_names = NULL;
     } else {
-        PCRE_make_nametable(rx, ri, namecount);
+        PCRE_make_nametable(re, ri, namecount);
     }
 
     /* set up space for the capture buffers */
@@ -112,7 +159,7 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
         PCRE_INFO_SIZE,
         &length
     );
-    rx->intflags = (U32)length;
+    re->intflags = (U32)length;
 
     /* Check how many parens we need */
     pcre_fullinfo(
@@ -122,9 +169,9 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
         &nparens
     );
 
-    rx->nparens = rx->lastparen = rx->lastcloseparen = nparens;
-    Newxz(rx->offs, nparens + 1, regexp_paren_pair);
-    
+    re->nparens = re->lastparen = re->lastcloseparen = nparens;
+    Newxz(re->offs, nparens + 1, regexp_paren_pair);
+
     /* return the regexp */
     return rx;
 }
@@ -134,13 +181,14 @@ PCRE_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
           char *strbeg, I32 minend, SV * sv,
           void *data, U32 flags)
 {
-    pcre *ri = rx->pprivate;
     I32 rc;
     int *ovector;
     I32 i;
     int nparens;
+    regexp * re = RegSV(rx);
+    pcre *ri = re->pprivate;
 
-    Newx(ovector, rx->intflags, int);
+    Newx(ovector, re->intflags, int);
 
     rc = (I32)pcre_exec(
         ri,
@@ -150,7 +198,7 @@ PCRE_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
         stringarg - strbeg, /* offset */
         0,
         ovector,
-        rx->intflags /* XXX: was 30 */
+        re->intflags /* XXX: was 30 */
     );
 
     /* Matching failed */
@@ -165,17 +213,17 @@ PCRE_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
         return 0;
     }
 
-    rx->subbeg = strbeg;
-    rx->sublen = strend - strbeg;
-    
+    re->subbeg = strbeg;
+    re->sublen = strend - strbeg;
+
     for (i = 0; i < rc; i++) {
-        rx->offs[i].start = ovector[i * 2];
-        rx->offs[i].end   = ovector[i * 2 + 1];
+        re->offs[i].start = ovector[i * 2];
+        re->offs[i].end   = ovector[i * 2 + 1];
     }
 
-    for (i = rc; i <= rx->nparens; i++) {
-        rx->offs[i].start = -1;
-        rx->offs[i].end   = -1;
+    for (i = rc; i <= re->nparens; i++) {
+        re->offs[i].start = -1;
+        re->offs[i].end   = -1;
     }
 
 
@@ -209,14 +257,16 @@ PCRE_checkstr(pTHX_ REGEXP * const rx)
 void
 PCRE_free(pTHX_ REGEXP * const rx)
 {
-    pcre_free(rx->pprivate);
+    regexp * re = RegSV(rx);
+    pcre_free(re->pprivate);
 }
 
 void *
 PCRE_dupe(pTHX_ REGEXP * const rx, CLONE_PARAMS *param)
 {
 	PERL_UNUSED_ARG(param);
-    return rx->pprivate;
+    regexp * re = RegSV(rx);
+    return re->pprivate;
 }
 
 SV *
@@ -231,7 +281,7 @@ PCRE_package(pTHX_ REGEXP * const rx)
  */
 
 void
-PCRE_make_nametable(REGEXP * const rx, pcre * const ri, const int namecount)
+PCRE_make_nametable(regexp * const re, pcre * const ri, const int namecount)
 {
     unsigned char *name_table, *tabptr;
     int name_entry_size;
@@ -254,14 +304,14 @@ PCRE_make_nametable(REGEXP * const rx, pcre * const ri, const int namecount)
         &name_entry_size
      );
 
-    rx->paren_names = newHV();
+    re->paren_names = newHV();
     tabptr = name_table;
 
     for (i = 0; i < namecount; i++)
     {
         const char *key = tabptr + 2;
         int npar = (tabptr[0] << 8) | tabptr[1];
-        SV *sv_dat = *hv_fetch(rx->paren_names, key, strlen(key), TRUE);
+        SV *sv_dat = *hv_fetch(re->paren_names, key, strlen(key), TRUE);
 
         if (!sv_dat)
             croak("panic: paren_name hash element allocation failed");
