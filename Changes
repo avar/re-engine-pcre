@@ -2,6 +2,8 @@ Revision history for re::engine::PCRE
 
 {{$NEXT}}
 
+0.17 2011-01-29 12:12:51
+
     - Upgraded to work with the perl 5.12 (and current blead) series
       as well as 5.10 by David Leadbeater. See
       https://github.com/avar/re-engine-pcre/pull/1
