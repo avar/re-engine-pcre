@@ -13,7 +13,11 @@
 #endif
 
 REGEXP *
+#if PERL_VERSION < 12
 PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
+#else
+PCRE_comp(pTHX_ SV * const pattern, U32 flags)
+#endif
 {
     REGEXP *rx;
     regexp *re;
@@ -36,7 +40,7 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
     /* pcre_compile */
     int options = PCRE_DUPNAMES;
 
-    /* named captures */
+    /* named captures (since 5.14) */
     int namecount;
 
     sv_2mortal(wrapped);
@@ -139,6 +143,7 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
     re->pprivate = ri;
 
     /* If named captures are defined make rx->paren_names */
+#if PERL_VERSION >= 14
     pcre_fullinfo(
         ri,
         NULL,
@@ -151,6 +156,7 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
     } else {
         PCRE_make_nametable(re, ri, namecount);
     }
+#endif
 
     /* set up space for the capture buffers */
     pcre_fullinfo(
@@ -176,10 +182,33 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
     return rx;
 }
 
+#if PERL_VERSION >= 18
+REGEXP*  PCRE_op_comp(pTHX_ SV ** const patternp, int pat_count,
+                       OP *expr, const struct regexp_engine* eng,
+                       REGEXP *old_re,
+                       bool *is_bare_re, U32 orig_rx_flags, U32 pm_flags)
+{
+    PERL_UNUSED_ARG(pat_count);
+    PERL_UNUSED_ARG(expr);
+    PERL_UNUSED_ARG(eng);
+    PERL_UNUSED_ARG(old_re);
+    PERL_UNUSED_ARG(is_bare_re);
+    PERL_UNUSED_ARG(pm_flags);
+    return PCRE_comp(aTHX_ patternp ? *patternp : cSVOPx_sv(expr), orig_rx_flags);
+}
+#endif
+
+
 I32
+#if PERL_VERSION < 20
 PCRE_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
           char *strbeg, I32 minend, SV * sv,
           void *data, U32 flags)
+#else
+PCRE_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
+          char *strbeg, SSize_t minend, SV * sv,
+          void *data, U32 flags)
+#endif
 {
     I32 rc;
     int *ovector;
@@ -235,11 +264,19 @@ PCRE_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
 }
 
 char *
-PCRE_intuit(pTHX_ REGEXP * const rx, SV * sv, char *strpos,
-             char *strend, U32 flags, re_scream_pos_data *data)
+#if PERL_VERSION < 20
+PCRE_intuit(pTHX_ REGEXP * const rx, SV * sv,
+             char *strpos, char *strend, const U32 flags, re_scream_pos_data *data)
+#else
+PCRE_intuit(pTHX_ REGEXP * const rx, SV * sv, const char *strbeg,
+             char *strpos, char *strend, U32 flags, re_scream_pos_data *data)
+#endif
 {
 	PERL_UNUSED_ARG(rx);
 	PERL_UNUSED_ARG(sv);
+#if PERL_VERSION >= 20
+	PERL_UNUSED_ARG(strbeg);
+#endif
 	PERL_UNUSED_ARG(strpos);
 	PERL_UNUSED_ARG(strend);
 	PERL_UNUSED_ARG(flags);
@@ -280,6 +317,7 @@ PCRE_package(pTHX_ REGEXP * const rx)
  * Internal utility functions
  */
 
+#if PERL_VERSION >= 14
 void
 PCRE_make_nametable(regexp * const re, pcre * const ri, const int namecount)
 {
@@ -309,7 +347,7 @@ PCRE_make_nametable(regexp * const re, pcre * const ri, const int namecount)
 
     for (i = 0; i < namecount; i++)
     {
-        const char *key = tabptr + 2;
+      const char *key = (char*)tabptr + 2;
         int npar = (tabptr[0] << 8) | tabptr[1];
         SV *sv_dat = *hv_fetch(re->paren_names, key, strlen(key), TRUE);
 
@@ -347,6 +385,7 @@ PCRE_make_nametable(regexp * const re, pcre * const ri, const int namecount)
         tabptr += name_entry_size;
     }
 }
+#endif
 
 MODULE = re::engine::PCRE	PACKAGE = re::engine::PCRE
 PROTOTYPES: ENABLE
