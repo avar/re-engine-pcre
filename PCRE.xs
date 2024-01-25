@@ -13,7 +13,7 @@
 #endif
 
 REGEXP *
-PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
+PCRE_comp(pTHX_ SV * const pattern, U32 flags)
 {
     REGEXP *rx;
     regexp *re;
@@ -178,7 +178,7 @@ PCRE_comp(pTHX_ const SV * const pattern, const U32 flags)
 
 I32
 PCRE_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
-          char *strbeg, I32 minend, SV * sv,
+          char *strbeg, SSize_t minend, SV * sv,
           void *data, U32 flags)
 {
     I32 rc;
@@ -235,11 +235,18 @@ PCRE_exec(pTHX_ REGEXP * const rx, char *stringarg, char *strend,
 }
 
 char *
-PCRE_intuit(pTHX_ REGEXP * const rx, SV * sv, char *strpos,
-             char *strend, U32 flags, re_scream_pos_data *data)
+PCRE_intuit(pTHX_ REGEXP * const rx, SV * sv,
+#if PERL_VERSION >= 20
+             const char * const strbeg,
+#endif
+             char *strpos, char *strend, const U32 flags,
+             re_scream_pos_data *data)
 {
 	PERL_UNUSED_ARG(rx);
 	PERL_UNUSED_ARG(sv);
+#if PERL_VERSION >= 20
+	PERL_UNUSED_ARG(strbeg);
+#endif
 	PERL_UNUSED_ARG(strpos);
 	PERL_UNUSED_ARG(strend);
 	PERL_UNUSED_ARG(flags);
