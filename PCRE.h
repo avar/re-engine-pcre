@@ -2,11 +2,15 @@
 
 START_EXTERN_C
 EXTERN_C const regexp_engine pcre_engine;
-EXTERN_C REGEXP * PCRE_comp(pTHX_ const SV const *, const U32);
+EXTERN_C REGEXP * PCRE_comp(pTHX_ SV * const, U32);
 EXTERN_C I32      PCRE_exec(pTHX_ REGEXP * const, char *, char *,
-                              char *, I32, SV *, void *, U32);
-EXTERN_C char *   PCRE_intuit(pTHX_ REGEXP * const, SV *, char *,
-                                char *, U32, re_scream_pos_data *);
+                              char *, SSize_t, SV *, void *, U32);
+EXTERN_C char *   PCRE_intuit(pTHX_ REGEXP * const, SV *,
+#if PERL_VERSION >= 20
+                                const char * const,
+#endif
+                                char *, char *, const U32,
+                                re_scream_pos_data *);
 EXTERN_C SV *     PCRE_checkstr(pTHX_ REGEXP * const);
 EXTERN_C void     PCRE_free(pTHX_ REGEXP * const);
 /* No numbered/named buff callbacks */
